@@ -1,0 +1,6 @@
+float32 alt_relative_m
+---
+ErrorCode error
+float32 final_alt_m
+---
+float32 current_alt_m

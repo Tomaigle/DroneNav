@@ -1,0 +1,7 @@
+uint8 CODE_OK = 0
+uint8 CODE_TIMEOUT = 1
+uint8 CODE_NOT_READY = 2
+uint8 CODE_PREEMPTED = 3
+uint8 CODE_REJECTED = 4
+uint8 CODE_LINK_LOST = 5
+uint8 code
