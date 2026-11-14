@@ -1,0 +1,13 @@
+std_msgs/Header header
+bool armed
+string mode
+float32 battery_percent
+float32 battery_voltage
+geometry_msgs/Pose pose
+bool link_ok
+uint8 POSITION_SOURCE_NONE=0
+uint8 POSITION_SOURCE_GPS=1
+uint8 POSITION_SOURCE_EXTNAV=2
+uint8 POSITION_SOURCE_FLOW=3
+uint8 position_source
+bool ready_for_position_control
