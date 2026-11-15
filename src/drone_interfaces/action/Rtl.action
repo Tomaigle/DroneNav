@@ -1,0 +1,5 @@
+---
+ErrorCode error
+---
+float32 current_alt_m
+float32 distance_to_home_m

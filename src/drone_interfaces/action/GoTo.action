@@ -1,0 +1,5 @@
+geometry_msgs/PoseStamped waypoint
+---
+ErrorCode error
+---
+float32 distance_m
