@@ -124,7 +124,7 @@ bool VehicleNode::link_ok() {
     state = last_state_;
     stamp = last_state_time_;
   }
-  return state && state->connected &&
+  return state and state->connected and
          (now() - stamp).seconds() < state_timeout_s_;
 }
 
@@ -135,7 +135,7 @@ std::string VehicleNode::current_mode() {
 
 bool VehicleNode::is_armed() {
   std::lock_guard<std::mutex> lock(data_mutex_);
-  return last_state_ && last_state_->armed;
+  return last_state_ and last_state_->armed;
 }
 
 void VehicleNode::state_cb(mavros_msgs::msg::State::ConstSharedPtr msg) {
@@ -143,11 +143,11 @@ void VehicleNode::state_cb(mavros_msgs::msg::State::ConstSharedPtr msg) {
 
   std::lock_guard<std::mutex> lock(data_mutex_);
 
-  if (last_state_ && last_state_->mode != msg->mode) {
+  if (last_state_ and last_state_->mode != msg->mode) {
     RCLCPP_INFO(get_logger(), "mode: %s -> %s", last_state_->mode.c_str(),
                 msg->mode.c_str());
   }
-  if (last_state_ && last_state_->connected != msg->connected) {
+  if (last_state_ and last_state_->connected != msg->connected) {
     RCLCPP_WARN(get_logger(), "FCU %s",
                 msg->connected ? "connected" : "disconnected");
   }
@@ -198,7 +198,7 @@ void VehicleNode::timer_cb() {
     }
     msg.armed = state->armed;
     msg.mode = state->mode;
-    msg.link_ok = state->connected && state_fresh;
+    msg.link_ok = state->connected and state_fresh;
   } else {
     msg.armed = false;
     msg.mode = "";
@@ -226,7 +226,7 @@ void VehicleNode::timer_cb() {
 
   msg.position_source = pose_fresh ? VehicleState::POSITION_SOURCE_GPS
                                    : VehicleState::POSITION_SOURCE_NONE;
-  msg.ready_for_position_control = msg.link_ok && pose_fresh;
+  msg.ready_for_position_control = msg.link_ok and pose_fresh;
 
   state_pub_->publish(msg);
 }
