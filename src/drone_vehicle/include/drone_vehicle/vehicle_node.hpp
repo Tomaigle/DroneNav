@@ -7,9 +7,12 @@
 #include "mavros_msgs/msg/state.hpp"
 #include "sensor_msgs/msg/battery_state.hpp"
 
+#include <rclcpp/callback_group.hpp>
 #include <rclcpp/node_options.hpp>
 #include <rclcpp/publisher.hpp>
 #include <rclcpp/subscription.hpp>
+
+#include <mutex>
 
 namespace drone_vehicle {
 class VehicleNode : public rclcpp::Node {
@@ -39,7 +42,13 @@ private:
 
   double publish_rate_hz_;
   double pose_timeout_s_;
-  double state_timeout_s;
+  double state_timeout_s_;
   int battery_cells_;
+
+  rclcpp::CallbackGroup::SharedPtr data_group_;
+  rclcpp::CallbackGroup::SharedPtr server_group_;
+  rclcpp::CallbackGroup::SharedPtr client_group_;
+
+  std::mutex data_mutex_;
 };
 } // namespace drone_vehicle
