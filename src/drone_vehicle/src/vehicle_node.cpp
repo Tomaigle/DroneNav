@@ -4,10 +4,12 @@
 #include "sensor_msgs/msg/battery_state.hpp"
 #include <chrono>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <rclcpp/callback_group.hpp>
 #include <rclcpp/logging.hpp>
 #include <rclcpp/node_options.hpp>
+#include <rclcpp/qos.hpp>
 #include <rclcpp/subscription_options.hpp>
 #include <stdexcept>
 #include <string>
@@ -21,6 +23,7 @@ VehicleNode::VehicleNode(const rclcpp::NodeOptions &options)
   pose_timeout_s_ = declare_parameter("pose_timeout_s", 0.5);
   state_timeout_s_ = declare_parameter("state_timeout_s", 3.0);
   battery_cells_ = declare_parameter<int>("battery_cells", 6);
+  command_timeout_s_ = declare_parameter("command_timeout_s", 3.0);
 
   for (const auto &[name, value] :
        get_node_parameters_interface()->get_parameter_overrides()) {
@@ -59,6 +62,11 @@ VehicleNode::VehicleNode(const rclcpp::NodeOptions &options)
                                 std::to_string(state_timeout_s_));
   }
 
+  if (command_timeout_s_ <= 0) {
+    throw std::invalid_argument("command timeout must be > 0" +
+                                std::to_string(state_timeout_s_));
+  }
+
   rclcpp::SubscriptionOptions sub_opts;
   sub_opts.callback_group = data_group_;
   state_sub_ = create_subscription<mavros_msgs::msg::State>(
@@ -88,7 +96,39 @@ VehicleNode::VehicleNode(const rclcpp::NodeOptions &options)
       std::chrono::duration<double>(1.0 / publish_rate_hz_),
       [this]() { timer_cb(); }, data_group_);
 
+  set_mode_client_ = create_client<MavSetMode>(
+      "/mavros/set_mode", rclcpp::ServicesQoS(), client_group_);
+
+  set_mode_srv_ = create_service<SetModeSrv>(
+      "/vehicle/set_mode",
+      [this](const std::shared_ptr<SetModeSrv::Request> req,
+             std::shared_ptr<SetModeSrv::Response> resp) {
+        set_mode_cb(req, resp);
+      },
+      rclcpp::ServicesQoS(), server_group_);
+
   RCLCPP_INFO(this->get_logger(), "vehicle node started");
+}
+
+bool VehicleNode::link_ok() {
+  mavros_msgs::msg::State::ConstSharedPtr state;
+  rclcpp::Time stamp;
+  {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    state = last_state_;
+    stamp = last_state_time_;
+  }
+  return state and state->connected and
+         (now() - stamp).seconds() < state_timeout_s_;
+}
+
+std::string VehicleNode::current_mode() {
+  mavros_msgs::msg::State::ConstSharedPtr state;
+  {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    state = last_state_;
+  }
+  return state ? state->mode : "";
 }
 
 void VehicleNode::state_cb(mavros_msgs::msg::State::ConstSharedPtr msg) {
@@ -153,7 +193,7 @@ void VehicleNode::timer_cb() {
 
   bool state_fresh = false;
 
-  if (last_state_) {
+  if (state) {
     msg.armed = state->armed;
     msg.mode = state->mode;
     state_fresh = (now() - state_time).seconds() < state_timeout_s_;

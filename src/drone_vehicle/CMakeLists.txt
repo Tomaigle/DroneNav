@@ -25,7 +25,8 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-add_library(vehicle_lib STATIC src/vehicle_node.cpp)
+add_library(vehicle_lib STATIC src/vehicle_node.cpp src/vehicle_services.cpp)
+
 target_compile_features(vehicle_lib PUBLIC cxx_std_20)
 
 target_include_directories(vehicle_lib PUBLIC
