@@ -35,8 +35,11 @@ private:
   geometry_msgs::msg::PoseStamped::ConstSharedPtr last_pose_;
   sensor_msgs::msg::BatteryState::ConstSharedPtr last_battery_;
   rclcpp::Time last_pose_time_;
+  rclcpp::Time last_state_time_;
 
   double publish_rate_hz_;
   double pose_timeout_s_;
+  double state_timeout_s;
+  int battery_cells_;
 };
 } // namespace drone_vehicle

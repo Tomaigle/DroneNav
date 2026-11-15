@@ -3,6 +3,7 @@ bool armed
 string mode
 float32 battery_percent
 float32 battery_voltage
+float32 battery_cell_voltage
 geometry_msgs/Pose pose
 bool link_ok
 uint8 POSITION_SOURCE_NONE=0
