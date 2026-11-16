@@ -18,6 +18,10 @@ def generate_launch_description():
                 "gcs_url",
                 default_value="udp://@127.0.0.1:14550",
             ),
+            DeclareLaunchArgument(
+                "record",
+                default_value="true",
+            ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     PathJoinSubstitution([bringup, "launch", "vehicle_launch.py"])
@@ -26,6 +30,8 @@ def generate_launch_description():
                     "fcu_url": LaunchConfiguration("fcu_url"),
                     "gcs_url": LaunchConfiguration("gcs_url"),
                     "config": PathJoinSubstitution([bringup, "config", "real.yaml"]),
+                    "record": LaunchConfiguration("record"),
+                    "bag_prefix": "real",
                 }.items(),
             ),
         ]

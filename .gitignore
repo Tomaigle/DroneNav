@@ -1,6 +1,7 @@
 build/
 install/
 log/
+bags/
 compile_commands.json
 .clangd
 .cache
