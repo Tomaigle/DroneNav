@@ -2,20 +2,28 @@
 
 #include <memory>
 #include <mutex>
+#include <rclcpp_action/server.hpp>
+#include <rclcpp_action/server_goal_handle.hpp>
+#include <rclcpp_action/types.hpp>
 #include <string>
 
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
 
+#include "drone_interfaces/action/takeoff.hpp"
 #include "drone_interfaces/msg/error_code.hpp"
 #include "drone_interfaces/msg/vehicle_state.hpp"
 #include "drone_interfaces/srv/arm.hpp"
 #include "drone_interfaces/srv/disarm.hpp"
 #include "drone_interfaces/srv/set_mode.hpp"
+
 #include "geometry_msgs/msg/pose_stamped.hpp"
+
+#include "sensor_msgs/msg/battery_state.hpp"
+
 #include "mavros_msgs/msg/state.hpp"
 #include "mavros_msgs/srv/command_bool.hpp"
 #include "mavros_msgs/srv/set_mode.hpp"
-#include "sensor_msgs/msg/battery_state.hpp"
 
 namespace drone_vehicle {
 
@@ -27,11 +35,50 @@ public:
 private:
   using VehicleState = drone_interfaces::msg::VehicleState;
   using ErrorCode = drone_interfaces::msg::ErrorCode;
+
   using SetModeSrv = drone_interfaces::srv::SetMode;
   using ArmSrv = drone_interfaces::srv::Arm;
   using DisarmSrv = drone_interfaces::srv::Disarm;
   using MavSetMode = mavros_msgs::srv::SetMode;
   using MavCommandBool = mavros_msgs::srv::CommandBool;
+
+  using TakeOffAction = drone_interfaces::action::Takeoff;
+  using GoalHandleTakeoff = rclcpp_action::ServerGoalHandle<TakeOffAction>;
+
+  double publish_rate_hz_;
+  double pose_timeout_s_;
+  double state_timeout_s_;
+  double command_timeout_s_;
+  int battery_cells_;
+
+  rclcpp::CallbackGroup::SharedPtr data_group_;
+  rclcpp::CallbackGroup::SharedPtr server_group_;
+  rclcpp::CallbackGroup::SharedPtr client_group_;
+  rclcpp::CallbackGroup::SharedPtr action_group_;
+
+  rclcpp::Subscription<mavros_msgs::msg::State>::SharedPtr state_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::BatteryState>::SharedPtr battery_sub_;
+
+  rclcpp::Publisher<VehicleState>::SharedPtr state_pub_;
+  rclcpp::TimerBase::SharedPtr timer_;
+
+  rclcpp::Service<SetModeSrv>::SharedPtr set_mode_srv_;
+  rclcpp::Service<ArmSrv>::SharedPtr arm_srv_;
+  rclcpp::Service<DisarmSrv>::SharedPtr disarm_srv_;
+
+  rclcpp::Client<MavSetMode>::SharedPtr set_mode_client_;
+  rclcpp::Client<MavCommandBool>::SharedPtr arming_client_;
+
+  rclcpp_action::Server<TakeOffAction>::SharedPtr takeoff_server_;
+
+  mavros_msgs::msg::State::ConstSharedPtr last_state_;
+  geometry_msgs::msg::PoseStamped::ConstSharedPtr last_pose_;
+  sensor_msgs::msg::BatteryState::ConstSharedPtr last_battery_;
+  rclcpp::Time last_state_time_;
+  rclcpp::Time last_pose_time_;
+
+  std::mutex data_mutex_;
 
   void state_cb(mavros_msgs::msg::State::ConstSharedPtr msg);
   void pose_cb(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg);
@@ -52,36 +99,17 @@ private:
   std::string current_mode();
   bool is_armed();
 
-  rclcpp::CallbackGroup::SharedPtr data_group_;
-  rclcpp::CallbackGroup::SharedPtr server_group_;
-  rclcpp::CallbackGroup::SharedPtr client_group_;
+  rclcpp_action::GoalResponse
+  takeoff_handle_goal(const rclcpp_action::GoalUUID &uuid,
+                      std::shared_ptr<const TakeOffAction::Goal> goal);
 
-  rclcpp::Subscription<mavros_msgs::msg::State>::SharedPtr state_sub_;
-  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::BatteryState>::SharedPtr battery_sub_;
+  rclcpp_action::CancelResponse
+  takeoff_handle_cancel(const std::shared_ptr<GoalHandleTakeoff> goal_handle);
 
-  rclcpp::Publisher<VehicleState>::SharedPtr state_pub_;
-  rclcpp::TimerBase::SharedPtr timer_;
+  void
+  takeoff_handle_accepted(const std::shared_ptr<GoalHandleTakeoff> goad_handle);
 
-  rclcpp::Service<SetModeSrv>::SharedPtr set_mode_srv_;
-  rclcpp::Service<ArmSrv>::SharedPtr arm_srv_;
-  rclcpp::Service<DisarmSrv>::SharedPtr disarm_srv_;
-
-  rclcpp::Client<MavSetMode>::SharedPtr set_mode_client_;
-  rclcpp::Client<MavCommandBool>::SharedPtr arming_client_;
-
-  std::mutex data_mutex_;
-  mavros_msgs::msg::State::ConstSharedPtr last_state_;
-  geometry_msgs::msg::PoseStamped::ConstSharedPtr last_pose_;
-  sensor_msgs::msg::BatteryState::ConstSharedPtr last_battery_;
-  rclcpp::Time last_state_time_;
-  rclcpp::Time last_pose_time_;
-
-  double publish_rate_hz_;
-  double pose_timeout_s_;
-  double state_timeout_s_;
-  double command_timeout_s_;
-  int battery_cells_;
+  void takeoff_execute(const std::shared_ptr<GoalHandleTakeoff> goal_handle);
 };
 
 } // namespace drone_vehicle

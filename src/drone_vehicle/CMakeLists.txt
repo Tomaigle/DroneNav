@@ -12,6 +12,7 @@ find_package(drone_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(mavros_msgs REQUIRED)
+find_package(rclcpp_action REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -25,7 +26,8 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-add_library(vehicle_lib STATIC src/vehicle_node.cpp src/vehicle_services.cpp)
+add_library(vehicle_lib STATIC src/vehicle_node.cpp src/vehicle_services.cpp
+src/vehicle_actions.cpp)
 
 target_compile_features(vehicle_lib PUBLIC cxx_std_20)
 
@@ -33,7 +35,7 @@ target_include_directories(vehicle_lib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(vehicle_lib
-  rclcpp drone_interfaces geometry_msgs sensor_msgs mavros_msgs)
+  rclcpp drone_interfaces geometry_msgs sensor_msgs mavros_msgs rclcpp_action)
 
 add_executable(vehicle_node src/main.cpp)
 target_link_libraries(vehicle_node vehicle_lib)

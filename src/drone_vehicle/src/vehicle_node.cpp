@@ -4,6 +4,8 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <rcl_action/action_server.h>
+#include <rclcpp_action/types.hpp>
 #include <stdexcept>
 #include <string>
 
@@ -113,6 +115,19 @@ VehicleNode::VehicleNode(const rclcpp::NodeOptions &options)
       },
       rclcpp::ServicesQoS(), server_group_);
 
+  takeoff_server_ = rclcpp_action::create_server<TakeOffAction>(
+      this, "/vehicle/takeoff",
+      [this](const rclcpp_action::GoalUUID &uuid,
+             std::shared_ptr<const TakeOffAction::Goal> goal) {
+        return takeoff_handle_goal(uuid, goal);
+      },
+      [this](const std::shared_ptr<GoalHandleTakeoff> goal_handle) {
+        return takeoff_handle_cancel(goal_handle);
+      },
+      [this](const std::shared_ptr<GoalHandleTakeoff> goal_handle) {
+        return takeoff_handle_accepted(goal_handle);
+      },
+      rcl_action_server_get_default_options(), action_group_);
   RCLCPP_INFO(get_logger(), "vehicle node started");
 }
 
