@@ -44,7 +44,9 @@ private:
               std::shared_ptr<ArmSrv::Response> resp);
   void disarm_cb(const std::shared_ptr<DisarmSrv::Request> req,
                  std::shared_ptr<DisarmSrv::Response> resp);
+
   void arm_disarm(bool arm, ErrorCode &error);
+  void set_mode(const std::string &mode, ErrorCode &error);
 
   bool link_ok();
   std::string current_mode();

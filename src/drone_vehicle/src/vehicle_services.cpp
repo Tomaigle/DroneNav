@@ -29,51 +29,55 @@ std::chrono::steady_clock::time_point deadline_after(double seconds) {
 }
 } // namespace
 
-void VehicleNode::set_mode_cb(const std::shared_ptr<SetModeSrv::Request> req,
-                              std::shared_ptr<SetModeSrv::Response> resp) {
-  const std::string srv = "set_mode " + req->mode;
+void VehicleNode::set_mode(const std::string &mode, ErrorCode &error) {
+  const std::string srv = "set_mode " + mode;
 
-  if (req->mode.empty()) {
-    return finish(get_logger(), resp->error, ErrorCode::CODE_REJECTED, srv,
+  if (mode.empty()) {
+    return finish(get_logger(), error, ErrorCode::CODE_REJECTED, srv,
                   "empty mode");
   }
   if (!link_ok()) {
-    return finish(get_logger(), resp->error, ErrorCode::CODE_LINK_LOST, srv,
+    return finish(get_logger(), error, ErrorCode::CODE_LINK_LOST, srv,
                   "link lost");
   }
-  if (current_mode() == req->mode) {
-    return finish(get_logger(), resp->error, ErrorCode::CODE_OK, srv,
+  if (current_mode() == mode) {
+    return finish(get_logger(), error, ErrorCode::CODE_OK, srv,
                   "already in mode");
   }
   if (!set_mode_client_->service_is_ready()) {
-    return finish(get_logger(), resp->error, ErrorCode::CODE_LINK_LOST, srv,
+    return finish(get_logger(), error, ErrorCode::CODE_LINK_LOST, srv,
                   "/mavros/set_mode not available");
   }
 
   auto request = std::make_shared<MavSetMode::Request>();
-  request->custom_mode = req->mode;
+  request->custom_mode = mode;
   auto future = set_mode_client_->async_send_request(request);
 
   if (future.wait_for(std::chrono::duration<double>(command_timeout_s_)) !=
       std::future_status::ready) {
-    return finish(get_logger(), resp->error, ErrorCode::CODE_TIMEOUT, srv,
+    return finish(get_logger(), error, ErrorCode::CODE_TIMEOUT, srv,
                   "no response from mavros");
   }
   if (!future.get()->mode_sent) {
-    return finish(get_logger(), resp->error, ErrorCode::CODE_REJECTED, srv,
+    return finish(get_logger(), error, ErrorCode::CODE_REJECTED, srv,
                   "mavros did not send mode");
   }
 
   const auto deadline = deadline_after(command_timeout_s_);
   while (std::chrono::steady_clock::now() < deadline) {
-    if (current_mode() == req->mode) {
-      return finish(get_logger(), resp->error, ErrorCode::CODE_OK, srv,
+    if (current_mode() == mode) {
+      return finish(get_logger(), error, ErrorCode::CODE_OK, srv,
                     "mode confirmed");
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
-  return finish(get_logger(), resp->error, ErrorCode::CODE_REJECTED, srv,
+  return finish(get_logger(), error, ErrorCode::CODE_REJECTED, srv,
                 "FC did not switch (check MAVProxy console)");
+}
+
+void VehicleNode::set_mode_cb(const std::shared_ptr<SetModeSrv::Request> req,
+                              std::shared_ptr<SetModeSrv::Response> resp) {
+  set_mode(req->mode, resp->error);
 }
 
 void VehicleNode::arm_cb(const std::shared_ptr<ArmSrv::Request> /*req*/,
