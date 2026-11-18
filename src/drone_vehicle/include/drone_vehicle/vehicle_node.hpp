@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <rclcpp_action/server.hpp>
 #include <rclcpp_action/server_goal_handle.hpp>
 #include <rclcpp_action/types.hpp>
@@ -50,6 +51,10 @@ private:
   double state_timeout_s_;
   double command_timeout_s_;
   int battery_cells_;
+  double max_alt_m_;
+  double pose_lost_timeout_s_;
+  double takeoff_timeout_s_;
+  double takeoff_alt_tolerance_m_;
 
   rclcpp::CallbackGroup::SharedPtr data_group_;
   rclcpp::CallbackGroup::SharedPtr server_group_;
@@ -92,12 +97,20 @@ private:
   void disarm_cb(const std::shared_ptr<DisarmSrv::Request> req,
                  std::shared_ptr<DisarmSrv::Response> resp);
 
+  std::optional<geometry_msgs::msg::Pose> current_pose();
+
   void arm_disarm(bool arm, ErrorCode &error);
   void set_mode(const std::string &mode, ErrorCode &error);
 
   bool link_ok();
   std::string current_mode();
   bool is_armed();
+  bool pose_fresh();
+  bool ready_for_pos_control();
+
+  bool fail_if_error(const ErrorCode &err,
+                     const std::shared_ptr<GoalHandleTakeoff> &goal_handle,
+                     const std::shared_ptr<TakeOffAction::Result> &result);
 
   rclcpp_action::GoalResponse
   takeoff_handle_goal(const rclcpp_action::GoalUUID &uuid,
@@ -107,7 +120,7 @@ private:
   takeoff_handle_cancel(const std::shared_ptr<GoalHandleTakeoff> goal_handle);
 
   void
-  takeoff_handle_accepted(const std::shared_ptr<GoalHandleTakeoff> goad_handle);
+  takeoff_handle_accepted(const std::shared_ptr<GoalHandleTakeoff> goal_handle);
 
   void takeoff_execute(const std::shared_ptr<GoalHandleTakeoff> goal_handle);
 };

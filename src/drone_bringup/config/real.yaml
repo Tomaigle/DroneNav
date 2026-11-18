@@ -6,3 +6,7 @@ vehicle:
     command_timeout_s: 3.0
     battery_cells: 6
     use_sim_time: false
+    max_alt_m: 3.0
+    pose_lost_timeout_s: 1.0
+    takeoff_alt_tolerance_m: 0.2
+    takeoff_timeout_s: 15.0

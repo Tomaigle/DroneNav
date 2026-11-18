@@ -1,8 +1,12 @@
 vehicle:
   ros__parameters:
+    use_sim_time: false
     publish_rate_hz: 10.0
     pose_timeout_s: 0.5
     state_timeout_s: 3.0
     command_timeout_s: 3.0
     battery_cells: 3
-    use_sim_time: false
+    max_alt_m: 10.0
+    pose_lost_timeout_s: 1.0
+    takeoff_timeout_s: 30.0
+    takeoff_alt_tolerance_m: 0.2

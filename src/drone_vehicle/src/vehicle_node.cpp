@@ -1,10 +1,13 @@
 #include "drone_vehicle/vehicle_node.hpp"
+#include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 
 #include <chrono>
 #include <limits>
 #include <memory>
 #include <mutex>
 #include <rcl_action/action_server.h>
+#include <rclcpp/callback_group.hpp>
 #include <rclcpp_action/types.hpp>
 #include <stdexcept>
 #include <string>
@@ -18,6 +21,10 @@ VehicleNode::VehicleNode(const rclcpp::NodeOptions &options)
   state_timeout_s_ = declare_parameter("state_timeout_s", 3.0);
   command_timeout_s_ = declare_parameter("command_timeout_s", 3.0);
   battery_cells_ = declare_parameter<int>("battery_cells", 6);
+  max_alt_m_ = declare_parameter("max_alt_m", 10.0);
+  pose_lost_timeout_s_ = declare_parameter("pose_lost_timeout_s", 1.0);
+  takeoff_timeout_s_ = declare_parameter("takeoff_timeout_s", 30.0);
+  takeoff_alt_tolerance_m_ = declare_parameter("takeoff_alt_tolerance_m", 0.2);
 
   if (publish_rate_hz_ <= 0.0) {
     throw std::invalid_argument("publish_rate_hz must be > 0, got: " +
@@ -40,6 +47,30 @@ VehicleNode::VehicleNode(const rclcpp::NodeOptions &options)
                                 std::to_string(battery_cells_));
   }
 
+  if (max_alt_m_ <= 0.0) {
+    throw std::invalid_argument("max_alt_m must be > 0, got: " +
+                                std::to_string(max_alt_m_));
+  }
+
+  if (takeoff_alt_tolerance_m_ >= max_alt_m_) {
+    throw std::invalid_argument("takeoff_alt_tolerance_m_ must be < max_alt_m");
+  }
+
+  if (pose_lost_timeout_s_ <= 0.0) {
+    throw std::invalid_argument("pose_lost_timeout_s_ must be > 0, got: " +
+                                std::to_string(pose_lost_timeout_s_));
+  }
+
+  if (takeoff_timeout_s_ <= 0.0) {
+    throw std::invalid_argument("takeoff_timeout_s must be > 0, got: " +
+                                std::to_string(takeoff_alt_tolerance_m_));
+  }
+
+  if (takeoff_alt_tolerance_m_ <= 0.0) {
+    throw std::invalid_argument("takeoff_alt_tolerance_m_ must be > 0, got: " +
+                                std::to_string(takeoff_alt_tolerance_m_));
+  }
+
   for (const auto &[name, value] :
        get_node_parameters_interface()->get_parameter_overrides()) {
     if (!has_parameter(name)) {
@@ -56,6 +87,8 @@ VehicleNode::VehicleNode(const rclcpp::NodeOptions &options)
   server_group_ =
       create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   client_group_ =
+      create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  action_group_ =
       create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   rclcpp::SubscriptionOptions sub_opts;
@@ -153,6 +186,35 @@ bool VehicleNode::is_armed() {
   return last_state_ and last_state_->armed;
 }
 
+bool VehicleNode::pose_fresh() { return current_pose().has_value(); }
+
+bool VehicleNode::ready_for_pos_control() { return link_ok() and pose_fresh(); }
+
+bool VehicleNode::fail_if_error(
+    const ErrorCode &err, const std::shared_ptr<GoalHandleTakeoff> &goal_handle,
+    const std::shared_ptr<TakeOffAction::Result> &result) {
+
+  if ((err.code == ErrorCode::CODE_OK)) {
+    return false;
+  }
+  result->error = err;
+  goal_handle->abort(result);
+  return true;
+}
+
+std::optional<geometry_msgs::msg::Pose> VehicleNode::current_pose() {
+  geometry_msgs::msg::PoseStamped::ConstSharedPtr pose;
+  rclcpp::Time stamp;
+  {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    pose = last_pose_;
+    stamp = last_pose_time_;
+  }
+  if (!pose or (now() - stamp).seconds() >= pose_timeout_s_) {
+    return std::nullopt;
+  }
+  return pose->pose;
+}
 void VehicleNode::state_cb(mavros_msgs::msg::State::ConstSharedPtr msg) {
   RCLCPP_INFO_ONCE(get_logger(), "first state received");
 
@@ -213,7 +275,7 @@ void VehicleNode::timer_cb() {
     }
     msg.armed = state->armed;
     msg.mode = state->mode;
-    msg.link_ok = state->connected and state_fresh;
+    msg.link_ok = link_ok();
   } else {
     msg.armed = false;
     msg.mode = "";
@@ -230,18 +292,17 @@ void VehicleNode::timer_cb() {
     msg.battery_cell_voltage = std::numeric_limits<float>::quiet_NaN();
   }
 
-  bool pose_fresh = false;
+  bool pose_f = pose_fresh();
   if (pose) {
     msg.pose = pose->pose;
-    pose_fresh = (now() - pose_time).seconds() < pose_timeout_s_;
-    if (!pose_fresh) {
+    if (!pose_f) {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "pose stale");
     }
   }
 
-  msg.position_source = pose_fresh ? VehicleState::POSITION_SOURCE_GPS
-                                   : VehicleState::POSITION_SOURCE_NONE;
-  msg.ready_for_position_control = msg.link_ok and pose_fresh;
+  msg.position_source = pose_f ? VehicleState::POSITION_SOURCE_GPS
+                               : VehicleState::POSITION_SOURCE_NONE;
+  msg.ready_for_position_control = ready_for_pos_control();
 
   state_pub_->publish(msg);
 }

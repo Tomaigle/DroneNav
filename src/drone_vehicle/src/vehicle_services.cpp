@@ -1,4 +1,5 @@
 #include "drone_interfaces/msg/error_code.hpp"
+#include "drone_vehicle/time_utils.hpp"
 #include "drone_vehicle/vehicle_node.hpp"
 
 #include <chrono>
@@ -20,12 +21,6 @@ void finish(const rclcpp::Logger &logger, ErrorCode &error, uint8_t code,
   } else {
     RCLCPP_WARN(logger, "%s: %s", service.c_str(), why.c_str());
   }
-}
-
-std::chrono::steady_clock::time_point deadline_after(double seconds) {
-  return std::chrono::steady_clock::now() +
-         std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-             std::chrono::duration<double>(seconds));
 }
 } // namespace
 
