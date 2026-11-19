@@ -24,6 +24,7 @@
 
 #include "mavros_msgs/msg/state.hpp"
 #include "mavros_msgs/srv/command_bool.hpp"
+#include "mavros_msgs/srv/command_tol.hpp"
 #include "mavros_msgs/srv/set_mode.hpp"
 
 namespace drone_vehicle {
@@ -42,6 +43,7 @@ private:
   using DisarmSrv = drone_interfaces::srv::Disarm;
   using MavSetMode = mavros_msgs::srv::SetMode;
   using MavCommandBool = mavros_msgs::srv::CommandBool;
+  using MavCommandTOL = mavros_msgs::srv::CommandTOL;
 
   using TakeOffAction = drone_interfaces::action::Takeoff;
   using GoalHandleTakeoff = rclcpp_action::ServerGoalHandle<TakeOffAction>;
@@ -74,6 +76,7 @@ private:
 
   rclcpp::Client<MavSetMode>::SharedPtr set_mode_client_;
   rclcpp::Client<MavCommandBool>::SharedPtr arming_client_;
+  rclcpp::Client<MavCommandTOL>::SharedPtr takeoff_client_;
 
   rclcpp_action::Server<TakeOffAction>::SharedPtr takeoff_server_;
 
@@ -101,6 +104,7 @@ private:
 
   void arm_disarm(bool arm, ErrorCode &error);
   void set_mode(const std::string &mode, ErrorCode &error);
+  void takeoff(double alt, ErrorCode &erorr);
 
   bool link_ok();
   std::string current_mode();

@@ -1,6 +1,7 @@
 #include "drone_interfaces/msg/error_code.hpp"
 #include "drone_vehicle/time_utils.hpp"
 #include "drone_vehicle/vehicle_node.hpp"
+#include "mavros_msgs/srv/command_tol.hpp"
 
 #include <chrono>
 #include <future>
@@ -130,4 +131,36 @@ void VehicleNode::arm_disarm(bool arm, ErrorCode &error) {
                 "state did not change");
 }
 
+void VehicleNode::takeoff(double alt, ErrorCode &error) {
+
+  const std::string srv = "takeoff";
+  if (!link_ok()) {
+    return finish(get_logger(), error, ErrorCode::CODE_LINK_LOST, srv,
+                  "link lost");
+  }
+  if (!takeoff_client_->service_is_ready()) {
+    return finish(get_logger(), error, ErrorCode::CODE_LINK_LOST, srv,
+                  "/mavros/cmd/tkaeoff not available");
+  }
+  auto request = std::make_shared<MavCommandTOL::Request>();
+  request->min_pitch = 0.0f;
+  request->yaw = 0.0f;
+  request->latitude = 0.0f;
+  request->longitude = 0.0f;
+  request->altitude = alt;
+
+  auto future = takeoff_client_->async_send_request(request);
+
+  if (future.wait_for(std::chrono::duration<double>(command_timeout_s_)) !=
+      std::future_status::ready) {
+    return finish(get_logger(), error, ErrorCode::CODE_TIMEOUT, srv,
+                  "no response from mavros");
+  }
+  const auto response = future.get();
+  if (!response->success) {
+    return finish(get_logger(), error, ErrorCode::CODE_REJECTED, srv,
+                  "FC refused (MAV_RESULT " + std::to_string(response->result) +
+                      ", check MAVProxy console)");
+  }
+}
 } // namespace drone_vehicle

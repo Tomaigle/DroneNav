@@ -9,4 +9,4 @@ vehicle:
     max_alt_m: 10.0
     pose_lost_timeout_s: 1.0
     takeoff_timeout_s: 30.0
-    takeoff_alt_tolerance_m: 0.2
+    takeoff_alt_tolerance_m: 0.00001

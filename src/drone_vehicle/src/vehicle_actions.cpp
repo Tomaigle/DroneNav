@@ -73,7 +73,7 @@ void VehicleNode::takeoff_execute(
     return;
   }
 
-  // TODO: /mavros/cmd/takeoff (CommandTOL) here
+  takeoff(goal->alt_relative_m, err);
 
   auto hold_and_abort = [&](uint8_t code, const char *why) {
     ErrorCode stop_err;

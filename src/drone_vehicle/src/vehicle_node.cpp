@@ -126,6 +126,9 @@ VehicleNode::VehicleNode(const rclcpp::NodeOptions &options)
   arming_client_ = create_client<MavCommandBool>(
       "/mavros/cmd/arming", rclcpp::ServicesQoS(), client_group_);
 
+  takeoff_client_ = create_client<MavCommandTOL>(
+      "/mavros/cmd/takeoff", rclcpp::ServicesQoS(), client_group_);
+
   set_mode_srv_ = create_service<SetModeSrv>(
       "/vehicle/set_mode",
       [this](const std::shared_ptr<SetModeSrv::Request> req,
