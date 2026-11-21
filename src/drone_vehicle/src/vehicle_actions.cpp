@@ -93,7 +93,7 @@ void VehicleNode::takeoff_execute(
     goal_handle->abort(result);
   };
 
-  rclcpp::Rate loop_rate(10);
+  rclcpp::WallRate loop_rate(10);
   auto pose_lost_deadline = deadline_after(pose_lost_timeout_s_);
   const auto takeoff_deadline = deadline_after(takeoff_timeout_s_);
 

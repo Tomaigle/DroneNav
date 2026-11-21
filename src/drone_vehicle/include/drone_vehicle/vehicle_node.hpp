@@ -51,6 +51,8 @@ private:
   using TakeOffAction = drone_interfaces::action::Takeoff;
   using GoalHandleTakeoff = rclcpp_action::ServerGoalHandle<TakeOffAction>;
 
+  using SteadyTp = std::chrono::steady_clock::time_point;
+
   double publish_rate_hz_;
   double pose_timeout_s_;
   double state_timeout_s_;
@@ -86,8 +88,8 @@ private:
   mavros_msgs::msg::State::ConstSharedPtr last_state_;
   geometry_msgs::msg::PoseStamped::ConstSharedPtr last_pose_;
   sensor_msgs::msg::BatteryState::ConstSharedPtr last_battery_;
-  rclcpp::Time last_state_time_;
-  rclcpp::Time last_pose_time_;
+  SteadyTp last_state_time_{};
+  SteadyTp last_pose_time_{};
 
   std::mutex data_mutex_;
 

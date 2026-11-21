@@ -1,4 +1,5 @@
 #include "drone_vehicle/vehicle_node.hpp"
+#include "drone_vehicle/time_utils.hpp"
 #include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 
@@ -78,9 +79,6 @@ VehicleNode::VehicleNode(const rclcpp::NodeOptions &options)
                   name.c_str());
     }
   }
-
-  last_state_time_ = rclcpp::Time(0, 0, get_clock()->get_clock_type());
-  last_pose_time_ = rclcpp::Time(0, 0, get_clock()->get_clock_type());
 
   data_group_ =
       create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -175,14 +173,13 @@ VehicleNode::~VehicleNode() {
 
 bool VehicleNode::link_ok() {
   mavros_msgs::msg::State::ConstSharedPtr state;
-  rclcpp::Time stamp;
+  SteadyTp stamp;
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
     state = last_state_;
     stamp = last_state_time_;
   }
-  return state and state->connected and
-         (now() - stamp).seconds() < state_timeout_s_;
+  return state and state->connected and age_s(stamp) < state_timeout_s_;
 }
 
 std::string VehicleNode::current_mode() {
@@ -213,13 +210,13 @@ bool VehicleNode::fail_if_error(
 
 std::optional<geometry_msgs::msg::Pose> VehicleNode::current_pose() {
   geometry_msgs::msg::PoseStamped::ConstSharedPtr pose;
-  rclcpp::Time stamp;
+  SteadyTp stamp;
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
     pose = last_pose_;
     stamp = last_pose_time_;
   }
-  if (!pose or (now() - stamp).seconds() >= pose_timeout_s_) {
+  if (!pose or (age_s(stamp) >= pose_timeout_s_)) {
     return std::nullopt;
   }
   return pose->pose;
@@ -239,7 +236,7 @@ void VehicleNode::state_cb(mavros_msgs::msg::State::ConstSharedPtr msg) {
   }
 
   last_state_ = std::move(msg);
-  last_state_time_ = now();
+  last_state_time_ = std::chrono::steady_clock::now();
 }
 
 void VehicleNode::pose_cb(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg) {
@@ -247,7 +244,7 @@ void VehicleNode::pose_cb(geometry_msgs::msg::PoseStamped::ConstSharedPtr msg) {
 
   std::lock_guard<std::mutex> lock(data_mutex_);
   last_pose_ = std::move(msg);
-  last_pose_time_ = now();
+  last_state_time_ = std::chrono::steady_clock::now();
 }
 
 void VehicleNode::battery_cb(
@@ -263,7 +260,7 @@ void VehicleNode::timer_cb() {
   mavros_msgs::msg::State::ConstSharedPtr state;
   geometry_msgs::msg::PoseStamped::ConstSharedPtr pose;
   sensor_msgs::msg::BatteryState::ConstSharedPtr battery;
-  rclcpp::Time state_time, pose_time;
+  SteadyTp state_time, pose_time;
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
     state = last_state_;
@@ -278,7 +275,7 @@ void VehicleNode::timer_cb() {
   msg.header.frame_id = "map";
 
   if (state) {
-    const bool state_fresh = (now() - state_time).seconds() < state_timeout_s_;
+    const bool state_fresh = age_s(state_time) < state_timeout_s_;
     if (!state_fresh) {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "state stale");
     }
