@@ -162,5 +162,6 @@ void VehicleNode::takeoff(double alt, ErrorCode &error) {
                   "FC refused (MAV_RESULT " + std::to_string(response->result) +
                       ", check MAVProxy console)");
   }
+  return finish(get_logger(), error, ErrorCode::CODE_OK, srv, "accepted");
 }
 } // namespace drone_vehicle

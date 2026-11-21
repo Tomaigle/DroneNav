@@ -167,6 +167,12 @@ VehicleNode::VehicleNode(const rclcpp::NodeOptions &options)
   RCLCPP_INFO(get_logger(), "vehicle node started");
 }
 
+VehicleNode::~VehicleNode() {
+  if (exec_thread_.joinable()) {
+    exec_thread_.join();
+  }
+}
+
 bool VehicleNode::link_ok() {
   mavros_msgs::msg::State::ConstSharedPtr state;
   rclcpp::Time stamp;

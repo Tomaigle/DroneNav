@@ -34,6 +34,9 @@ public:
   explicit VehicleNode(
       const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
+  std::thread exec_thread_;
+  ~VehicleNode() override;
+
 private:
   using VehicleState = drone_interfaces::msg::VehicleState;
   using ErrorCode = drone_interfaces::msg::ErrorCode;

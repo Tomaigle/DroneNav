@@ -29,7 +29,9 @@ rclcpp_action::GoalResponse VehicleNode::takeoff_handle_goal(
     RCLCPP_WARN(this->get_logger(), "Vehicle not ready for positon control");
     return rclcpp_action::GoalResponse::REJECT;
   }
-
+  // TODO: single active motion goal (motion_active_ compare_exchange, last
+  // check here; RAII guard in takeoff_execute). Without it two takeoff threads
+  // can run at once.
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
@@ -74,6 +76,13 @@ void VehicleNode::takeoff_execute(
   }
 
   takeoff(goal->alt_relative_m, err);
+  if (err.code != ErrorCode::CODE_OK) {
+    ErrorCode disarm_err;
+    arm_disarm(false, disarm_err);
+    result->error = err;
+    goal_handle->abort(result);
+    return;
+  }
 
   auto hold_and_abort = [&](uint8_t code, const char *why) {
     ErrorCode stop_err;
@@ -101,6 +110,22 @@ void VehicleNode::takeoff_execute(
       goal_handle->canceled(result);
       RCLCPP_INFO(get_logger(), "takeoff: canceled at %.2f m",
                   feedback->current_alt_m);
+      return;
+    }
+
+    if (!link_ok()) {
+      RCLCPP_ERROR(get_logger(), "takeoff: link lost");
+      result->error.code = ErrorCode::CODE_LINK_LOST;
+      result->final_alt_m = feedback->current_alt_m;
+      goal_handle->abort(result);
+      return;
+    }
+    if (current_mode() != "GUIDED" || !is_armed()) {
+      RCLCPP_WARN(get_logger(),
+                  "takeoff: pilot override / disarmed, stop commanding");
+      result->error.code = ErrorCode::CODE_PREEMPTED;
+      result->final_alt_m = feedback->current_alt_m;
+      goal_handle->abort(result);
       return;
     }
 
@@ -144,8 +169,11 @@ void VehicleNode::takeoff_execute(
 
 void VehicleNode::takeoff_handle_accepted(
     const std::shared_ptr<GoalHandleTakeoff> goal_handle) {
-  std::thread{[this, goal_handle] {
-    VehicleNode::takeoff_execute(goal_handle);
-  }}.detach();
+  if (exec_thread_.joinable()) {
+    exec_thread_.join();
+  }
+
+  exec_thread_ = std::thread{
+      [this, goal_handle] { VehicleNode::takeoff_execute(goal_handle); }};
 }
 } // namespace drone_vehicle
